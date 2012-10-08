@@ -1,0 +1,14 @@
+{application, weighter,
+ [
+  {description, "weighter: user weight management.  the points matter."},
+  {vsn, "0.3"},
+  {modules, []},
+  {registered, [weighter_sup]},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  riak_pool
+                 ]},
+  {mod, {weighter_app, []}},
+  {env, []}
+ ]}.
