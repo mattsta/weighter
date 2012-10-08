@@ -34,15 +34,19 @@ weighter_test_() ->
 %%%----------------------------------------------------------------------
 create_user_1() ->
   Result = weighter:setup_user(user1, vampire, 1, none),
-  ?assertEqual(ok, Result).
+  ResultBad = weighter:setup_user(user1, vampire, 1, user1),
+  ResultExists = weighter:setup_user(user1, vampire, 1, none),
+  ?assertEqual(707106, Result),
+  ?assertEqual(cant_inherit_from_self, ResultBad),
+  ?assertEqual(user_already_setup, ResultExists).
 
 create_user_3000() ->
   Result = weighter:setup_user(user3000, vampire, 3000, none),
-  ?assertEqual(ok, Result).
+  ?assertEqual(64024, Result).
 
 create_user_parent_1() ->
   Result = weighter:setup_user(userParent1, vampire, 3000, user1),
-  ?assertEqual(ok, Result).
+  ?assertEqual(64024, Result).
 
 weight_check_1() ->
   Result = weighter:weight_for_user(user1, vampire),

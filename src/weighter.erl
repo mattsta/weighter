@@ -17,20 +17,25 @@ start() ->
 %%%--------------------------------------------------------------------
 %%% Weight Allocation
 %%%--------------------------------------------------------------------
+setup_user(Uid, _, _, Uid) ->
+  cant_inherit_from_self;
 setup_user(Uid, Space, AgeFromSiteEpoch, InheritFromUid) when
     is_integer(AgeFromSiteEpoch) ->
-  {Rank, Growth, Decay} = space_rate(Space, AgeFromSiteEpoch),
-  UsableRank = iof(trunc(Rank)),
-  base_rank(Space, Uid, UsableRank),
-  add_to_total_rank(Space, Uid, UsableRank),
-  growth_rate(Space, Uid, Growth),
-  decay_rate(Space, Uid, Decay),
-  user_current_weight(Space, Uid, UsableRank),
-  case InheritFromUid of
-    none -> ok;
-       _ -> apply_inheritance(Space, InheritFromUid, Uid)
-  end,
-  ok.
+  case er:exists(redis_weighter, genkey(Space, Uid)) of
+     true -> user_already_setup;
+    false -> {Rank, Growth, Decay} = space_rate(Space, AgeFromSiteEpoch),
+             UsableRank = iof(trunc(Rank)),
+             base_rank(Space, Uid, UsableRank),
+             add_to_total_rank(Space, Uid, UsableRank),
+             growth_rate(Space, Uid, Growth),
+             decay_rate(Space, Uid, Decay),
+             user_current_weight(Space, Uid, UsableRank),
+             case InheritFromUid of
+               none -> ok;
+                  _ -> apply_inheritance(Space, InheritFromUid, Uid)
+             end,
+             trunc(Rank)
+  end.
 
 space_rate(vampire, AgeInSeconds) ->
   Rank = math:sqrt(math:pow(AgeInSeconds, -0.6) * 5000000000) * 10,
