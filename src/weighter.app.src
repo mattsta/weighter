@@ -6,8 +6,7 @@
   {registered, [weighter_sup]},
   {applications, [
                   kernel,
-                  stdlib,
-                  riak_pool
+                  stdlib
                  ]},
   {mod, {weighter_app, []}},
   {env, []}
