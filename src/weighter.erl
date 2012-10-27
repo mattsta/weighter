@@ -3,6 +3,7 @@
 -export([start/0]).
 -export([setup_user/4]).
 -export([use_weight/3, weight_for_user/2]).
+-export([receive_weight/4, receive_weight/5]).
 -export([total_rank/2]).
 
 % this is: calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}).
@@ -27,8 +28,14 @@ setup_user(Uid, Space, AgeFromSiteEpoch, InheritFromUid) when
              UsableRank = iof(trunc(Rank)),
              base_rank(Space, Uid, UsableRank),
              add_to_total_rank(Space, Uid, UsableRank),
-             growth_rate(Space, Uid, Growth),
-             decay_rate(Space, Uid, Decay),
+             case Growth of
+               false -> ok;
+                   _ -> growth_rate(Space, Uid, Growth)
+             end,
+             case Decay of
+               false -> ok;
+                   _ -> decay_rate(Space, Uid, Decay)
+             end,
              user_current_weight(Space, Uid, UsableRank),
              case InheritFromUid of
                none -> ok;
@@ -41,7 +48,13 @@ space_rate(vampire, AgeInSeconds) ->
   Rank = math:sqrt(math:pow(AgeInSeconds, -0.6) * 5000000000) * 10,
   GrowthRatePerSecond = 0.02 / (86400 * 20), % 20 day months
   DecayRatePerSecond = -0.09 / (86400 * 20),
-  {Rank, iof(GrowthRatePerSecond), iof(DecayRatePerSecond)}.
+  {Rank, iof(GrowthRatePerSecond), iof(DecayRatePerSecond)};
+space_rate(comments, _) ->
+  {0, false, false};
+space_rate(posts, _) ->
+  {0, false, false};
+space_rate(karma, _) ->
+  {0, false, false}.
 
 apply_inheritance(Space, FromUid, ToUid) ->
   with_lock(FromUid, Space, fun(_) ->
@@ -67,21 +80,42 @@ give(Space, Dosage, FromUid, ToUid) ->
 %%%--------------------------------------------------------------------
 %%% Weight Usage
 %%%--------------------------------------------------------------------
+calc_use(UseWeight, AvailableWeight) when UseWeight < AvailableWeight ->
+  {AvailableWeight - UseWeight, UseWeight};
+calc_use(UseWeight, AvailableWeight) when UseWeight >= AvailableWeight ->
+  {0, AvailableWeight}.
+
 use_weight(Uid, Space, UseWeight) when is_binary(UseWeight) ->
   use_weight(Uid, Space, list_to_integer(binary_to_list(UseWeight)));
 use_weight(Uid, Space, UseWeight) when is_integer(UseWeight) ->
   with_lock(Uid, Space, fun(AvailableWeight) ->
-    {NewWeight, UsedWeight} =
-      if
-        UseWeight < AvailableWeight ->
-          {AvailableWeight - UseWeight, UseWeight};
-        UseWeight >= AvailableWeight ->
-          {0, AvailableWeight}
-      end,
+    {NewWeight, UsedWeight} = calc_use(UseWeight, AvailableWeight),
     user_current_weight(Space, Uid, NewWeight),
     UsedWeight
   end).
-  
+
+receive_weight(FromUid, ToUid, Space, Amount) ->
+  receive_weight(FromUid, ToUid, Space, Amount, []).
+
+% You can't give/receive to/from yourself.
+receive_weight(Uid, Uid, _, _, _) -> 0;
+receive_weight(FromUid, ToUid, Space, Amount, ExtraSpaces) when
+    is_binary(Amount) ->
+  receive_weight(FromUid, ToUid, Space,
+    list_to_integer(binary_to_list(Amount)), ExtraSpaces);
+receive_weight(FromUid, ToUid, Space, Amount, ExtraSpaces) when
+    is_integer(Amount) andalso Amount > 0 ->
+  with_lock(FromUid, Space, fun(FromWeight) ->
+    with_lock(ToUid, Space, fun(ToWeight) ->
+      {_NewFromWeight, UsedWeight} = calc_use(Amount, FromWeight),
+      user_current_weight(Space, FromUid, FromWeight - UsedWeight),
+      user_current_weight(Space, ToUid, ToWeight + UsedWeight),
+      % extra non-pair-bound weight additions:
+      [add_to_user_current_weight(S, ToUid, UsedWeight) || S <- ExtraSpaces],
+      UsedWeight
+    end)
+  end).
+
 %%%--------------------------------------------------------------------
 %%% Weight Backending
 %%%--------------------------------------------------------------------
