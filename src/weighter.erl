@@ -45,7 +45,7 @@ setup_user(Uid, Space, AgeFromSiteEpoch, InheritFromUid) when
   end.
 
 space_rate(vampire, AgeInSeconds) ->
-  Rank = math:sqrt(math:pow(AgeInSeconds, -0.6) * 5000000000) * 10,
+  Rank = math:sqrt(math:pow(AgeInSeconds/1000, -0.6) * 5000000000) * 10,
   GrowthRatePerSecond = 0.02 / (86400 * 20), % 20 day months
   DecayRatePerSecond = -0.09 / (86400 * 20),
   {Rank, iof(GrowthRatePerSecond), iof(DecayRatePerSecond)};
