@@ -54,7 +54,9 @@ space_rate(comments, _) ->
 space_rate(posts, _) ->
   {0, false, false};
 space_rate(karma, _) ->
-  {0, false, false}.
+  {0, false, false};
+space_rate(mana, _) ->
+  {50, false, false}.
 
 apply_inheritance(Space, FromUid, ToUid) ->
   with_lock(FromUid, Space, fun(_) ->
